@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-""" format_block.py
+""" fmtblock.py
     ...Formats long text into terminal-friendly blocks of text.
     Christopher Welborn 02-03-2015
 """
@@ -20,15 +20,20 @@ SCRIPTDIR = os.path.abspath(sys.path[0])
 DEFAULT_WIDTH = 79
 
 USAGESTR = """{versionstr}
+
+    Formats text, files, or stdin, into blocks of text with a maximum width.
+    Output is printed to stdout.
+
     Usage:
         {script} -h | -v
-        {script} [WORDS...] [-c] ([-i num] | [-I num]) [-n] [-w num]
+        {script} [WORDS...] [-c] [-e] ([-i num] | [-I num]) [-l] [-n] [-w num]
 
     Options:
         WORDS                : Words to format into a block.
                                File names can be passed to read from a file.
                                If not given, stdin is used instead.
         -c,--chars           : Wrap on characters instead of spaces.
+        -e,--enumerate       : Print line numbers before each line.
         -h,--help            : Show this help message.
         -i num,--indent num  : Indention level. Each indent level is 4 spaces.
                                Maximum width includes any indention.
@@ -36,6 +41,8 @@ USAGESTR = """{versionstr}
         -I num,--INDENT num  : Same as --indent, except maximum width is
                                calculated after indention.
                                Default: 0
+        -l,--lstrip          : Remove leading spaces for each line, before
+                               indention.
         -n,--newlines        : Preserve newlines.
         -v,--version         : Show version.
         -w num,--width num   : Maximum width for the block.
@@ -60,6 +67,7 @@ def main(argd):
 
     if argd['WORDS']:
         # Try each argument as a file name.
+        # TODO: Just remove the WORDS feature and use stdin or FILE.
         argd['WORDS'] = (
             (try_read_file(w) if len(w) < 256 else w)
             for w in argd['WORDS']
@@ -68,48 +76,100 @@ def main(argd):
     else:
         words = read_stdin()
 
-    if len(words) < 256:
-        words = try_read_file(words)
-        if words is None:
-            return 1
+    block = iter_format_block(
+        words,
+        chars=argd['--chars'],
+        prepend=prepend,
+        blocksize=width,
+        newlines=argd['--newlines'],
+        lstrip=argd['--lstrip']
+    )
 
-    print('\n{}'.format(
-        format_block(
-            words,
-            chars=argd['--chars'],
-            prepend=prepend,
-            blocksize=width,
-            newlines=argd['--newlines']
-        )
-    ))
+    for i, line in enumerate(block):
+        if argd['--enumerate']:
+            # Current line number format supports up to 999 lines before
+            # messing up. Who would format 1000 lines like this anyway?
+            print('{: >3}: {}'.format(i, line))
+        else:
+            print(line)
 
     return 0
 
 
 def format_block(
         text,
-        prepend=None, lstrip=False, blocksize=60,
-        chars=False, newlines=False):
-    """ Format a long string into a block of newline seperated text. """
-    iterlines = make_block(
+        blocksize=60, chars=False, newlines=False,
+        prepend=None, strip_first=False, lstrip=False):
+    """ Format a long string into a block of newline seperated text.
+        Arguments:
+            See iter_format_block().
+    """
+    # Basic usage of iter_format_block(), for convenience.
+    return '\n'.join(
+        iter_format_block(
+            text,
+            prepend=prepend,
+            strip_first=strip_first,
+            blocksize=blocksize,
+            chars=chars,
+            newlines=newlines,
+            lstrip=lstrip
+        )
+    )
+
+
+def iter_format_block(
+        text,
+        blocksize=60, chars=False, newlines=False,
+        prepend=None, strip_first=False, lstrip=False):
+    """ Iterate over lines in a formatted block of text. This iterator allows
+        further modification to the lines before output.
+
+        Arguments:
+            text         : String to format.
+
+            blocksize    : Maximum width for each line. The prepend string is
+                           not included in this calculation.
+                           Default: 60
+
+            chars        : Whether to wrap on characters instead of spaces.
+                           Default: False
+
+            newlines     : Whether to preserve newlines in the original string.
+                           Default: False
+
+            prepend      : String to prepend before each line.
+
+            strip_first  : Whether to omit the prepend string for the first
+                           line.
+                           Default: False
+
+                           Example (when using prepend='$'):
+                            Without strip_first -> '$this', '$that', '$other'
+                               With strip_first -> 'this', '$that', '$other'
+
+            lstrip       : Whether to remove leading spaces from each line.
+                           This doesn't include any spaces in `prepend`.
+                           Default: False
+    """
+    iterlines = iter_block(
         text,
         blocksize=blocksize,
         chars=chars,
-        newlines=newlines)
+        newlines=newlines,
+        lstrip=lstrip)
     if prepend is None:
-        return '\n'.join(iterlines)
-    if lstrip:
-        # Add 'prepend' before each line, except the first.
-        return '\n{}'.format(prepend).join(iterlines)
-    # Add 'prepend' before each line.
-    return '{}{}'.format(prepend, '\n{}'.format(prepend).join(iterlines))
-
-# TODO: Possible `iter_format_block`, which would allow:
-#       for line in iter_format_block(s):
-#           f.write(line)
+        yield from iterlines
+    else:
+        # Prepend text to each line.
+        if strip_first:
+            # Omit the prepend from the first line.
+            yield iterlines.next()
+        for l in iterlines:
+            yield '{}{}'.format(prepend, l)
 
 
-def make_block(text, blocksize=60, chars=False, newlines=False):
+def iter_block(text, blocksize=60, chars=False, newlines=False, lstrip=False):
     """ Iterator that turns a long string into lines no greater than
         'blocksize' in length.
         This can wrap on spaces, instead of characters if 'chars' is falsey.
@@ -122,35 +182,49 @@ def make_block(text, blocksize=60, chars=False, newlines=False):
                          Default: False
             newlines   : Preserve newlines when True.
                          Default: False
+            lstrip     : Whether to remove leading spaces from each line.
+                         Default: False
     """
+    if lstrip:
+        # Remove leading spaces from each line.
+        fmtline = lambda s: s.lstrip()
+    else:
+        # Yield the line as-is.
+        fmtline = lambda s: s
+
     if chars and (not newlines):
         # Simple block by chars, newlines are treated as a space.
         text = ' '.join(text.splitlines())
         yield from (
-            text[i:i + blocksize] for i in range(0, len(text), blocksize)
+            fmtline(text[i:i + blocksize])
+            for i in range(0, len(text), blocksize)
         )
     elif newlines:
         # Preserve newlines
         for line in text.splitlines():
-            yield from make_block(line, blocksize=blocksize, chars=chars)
+            yield from iter_block(
+                line,
+                blocksize=blocksize,
+                chars=chars,
+                lstrip=lstrip)
     else:
         # Wrap on spaces (ignores newlines)..
-        # lines = []
         curline = ''
         for word in text.split():
-            possibleline = ' '.join((curline, word)) if curline else word
+            possibleline = ' '.join((curline, word))
 
             if len(possibleline) > blocksize:
-                yield curline
+                # This word would exceed the limit, start a new line with it.
+                yield fmtline(curline)
                 curline = word
             else:
                 curline = possibleline
         if curline:
-            yield curline
+            yield fmtline(curline)
 
 
 def parse_int(s):
-    """ Parse a string into an integer.
+    """ Parse a string as an integer.
         Exit with a message on failure.
     """
     try:
