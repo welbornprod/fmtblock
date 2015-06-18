@@ -11,7 +11,7 @@ import os
 import sys
 
 NAME = 'Format Block'
-VERSION = '0.1.1'
+VERSION = '0.1.2'
 VERSIONSTR = '{} v. {}'.format(NAME, VERSION)
 SCRIPT = os.path.split(os.path.abspath(sys.argv[0]))[1]
 SCRIPTDIR = os.path.abspath(sys.path[0])
@@ -22,7 +22,7 @@ DEFAULT_WIDTH = 79
 USAGESTR = """{versionstr}
     Usage:
         {script} -h | -v
-        {script} [WORDS...] [-c] [-i num] [-n] [-s] [-w num]
+        {script} [WORDS...] [-c] ([-i num] | [-I num]) [-n] [-w num]
 
     Options:
         WORDS                : Words to format into a block.
@@ -30,12 +30,19 @@ USAGESTR = """{versionstr}
                                If not given, stdin is used instead.
         -c,--chars           : Wrap on characters instead of spaces.
         -h,--help            : Show this help message.
-        -i num,--indent num  : Indention level.
+        -i num,--indent num  : Indention level. Each indent level is 4 spaces.
+                               Maximum width includes any indention.
+                               Default: 0
+        -I num,--INDENT num  : Same as --indent, except maximum width is
+                               calculated after indention.
                                Default: 0
         -n,--newlines        : Preserve newlines.
         -v,--version         : Show version.
         -w num,--width num   : Maximum width for the block.
                                Default: {defaultwidth}
+
+        By default words are wrapped on spaces, so lines may be longer than the
+        specified width. To force a hard limit use --chars.
 """.format(
     script=SCRIPT,
     versionstr=VERSIONSTR,
@@ -45,8 +52,11 @@ USAGESTR = """{versionstr}
 def main(argd):
     """ Main entry point, expects doctopt arg dict as argd. """
     width = parse_int(argd['--width'] or DEFAULT_WIDTH)
-    indent = parse_int(argd['--indent'] or 0)
+    indent = parse_int(argd['--indent'] or (argd['--INDENT'] or 0))
     prepend = ' ' * (indent * 4)
+    if prepend and argd['--indent']:
+        # Smart indent, change max width based on indention.
+        width -= len(prepend)
 
     if argd['WORDS']:
         # Try each argument as a file name.
