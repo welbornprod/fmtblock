@@ -11,7 +11,7 @@ import os
 import sys
 
 NAME = 'Format Block'
-VERSION = '0.1.2'
+VERSION = '0.2.0'
 VERSIONSTR = '{} v. {}'.format(NAME, VERSION)
 SCRIPT = os.path.split(os.path.abspath(sys.argv[0]))[1]
 SCRIPTDIR = os.path.abspath(sys.path[0])
@@ -76,11 +76,11 @@ def main(argd):
     else:
         words = read_stdin()
 
-    block = iter_format_block(
+    block = FormatBlock().iter_format_block(
         words,
         chars=argd['--chars'],
         prepend=prepend,
-        blocksize=width,
+        width=width,
         newlines=argd['--newlines'],
         lstrip=argd['--lstrip']
     )
@@ -96,131 +96,167 @@ def main(argd):
     return 0
 
 
-def format_block(
-        text,
-        blocksize=60, chars=False, newlines=False,
-        prepend=None, strip_first=False, lstrip=False):
-    """ Format a long string into a block of newline seperated text.
-        Arguments:
-            See iter_format_block().
+class FormatBlock(object):
+
+    """ Class to format text into a block, with or without indention.
+        Able to break on characters or words, and preserve newlines when
+        wanted.
+        This used to be purely procedural, but I decided it would be easier
+        to 'contain' this functionality and copy/paste this class where
+        needed.
     """
-    # Basic usage of iter_format_block(), for convenience.
-    return '\n'.join(
-        iter_format_block(
-            text,
-            prepend=prepend,
-            strip_first=strip_first,
-            blocksize=blocksize,
+    __slots__ = ('text',)
+
+    def __init__(self, text=None):
+        self.text = text or ''
+
+    def format(
+            self, text=None,
+            width=60, chars=False, newlines=False,
+            prepend=None, strip_first=False, lstrip=False):
+        """ Convenience method to allow things like this:
+            print(FormatBlock('this thing').format(width=20, chars=True))
+        """
+        return self.format_block(
+            text or self.text,
+            width=width,
             chars=chars,
             newlines=newlines,
-            lstrip=lstrip
-        )
-    )
+            prepend=prepend,
+            strip_first=strip_first,
+            lstrip=lstrip)
 
-
-def iter_format_block(
-        text,
-        blocksize=60, chars=False, newlines=False,
-        prepend=None, strip_first=False, lstrip=False):
-    """ Iterate over lines in a formatted block of text. This iterator allows
-        further modification to the lines before output.
-
-        Arguments:
-            text         : String to format.
-
-            blocksize    : Maximum width for each line. The prepend string is
-                           not included in this calculation.
-                           Default: 60
-
-            chars        : Whether to wrap on characters instead of spaces.
-                           Default: False
-
-            newlines     : Whether to preserve newlines in the original string.
-                           Default: False
-
-            prepend      : String to prepend before each line.
-
-            strip_first  : Whether to omit the prepend string for the first
-                           line.
-                           Default: False
-
-                           Example (when using prepend='$'):
-                            Without strip_first -> '$this', '$that', '$other'
-                               With strip_first -> 'this', '$that', '$other'
-
-            lstrip       : Whether to remove leading spaces from each line.
-                           This doesn't include any spaces in `prepend`.
-                           Default: False
-    """
-    iterlines = iter_block(
-        text,
-        blocksize=blocksize,
-        chars=chars,
-        newlines=newlines,
-        lstrip=lstrip)
-    if prepend is None:
-        yield from iterlines
-    else:
-        # Prepend text to each line.
-        if strip_first:
-            # Omit the prepend from the first line.
-            yield iterlines.next()
-        for l in iterlines:
-            yield '{}{}'.format(prepend, l)
-
-
-def iter_block(text, blocksize=60, chars=False, newlines=False, lstrip=False):
-    """ Iterator that turns a long string into lines no greater than
-        'blocksize' in length.
-        This can wrap on spaces, instead of characters if 'chars' is falsey.
-
-        Arguments:
-            text       : String to format.
-            blocksize  : Maximum width for each line.
-                         Default: 60
-            chars      : Wrap on characters if true, otherwise on spaces.
-                         Default: False
-            newlines   : Preserve newlines when True.
-                         Default: False
-            lstrip     : Whether to remove leading spaces from each line.
-                         Default: False
-    """
-    if lstrip:
-        # Remove leading spaces from each line.
-        fmtline = lambda s: s.lstrip()
-    else:
-        # Yield the line as-is.
-        fmtline = lambda s: s
-
-    if chars and (not newlines):
-        # Simple block by chars, newlines are treated as a space.
-        text = ' '.join(text.splitlines())
-        yield from (
-            fmtline(text[i:i + blocksize])
-            for i in range(0, len(text), blocksize)
-        )
-    elif newlines:
-        # Preserve newlines
-        for line in text.splitlines():
-            yield from iter_block(
-                line,
-                blocksize=blocksize,
+    def format_block(
+            self, text=None,
+            width=60, chars=False, newlines=False,
+            prepend=None, strip_first=False, lstrip=False):
+        """ Format a long string into a block of newline seperated text.
+            Arguments:
+                See iter_format_block().
+        """
+        # Basic usage of iter_format_block(), for convenience.
+        return '\n'.join(
+            self.iter_format_block(
+                text or self.text,
+                prepend=prepend,
+                strip_first=strip_first,
+                width=width,
                 chars=chars,
-                lstrip=lstrip)
-    else:
-        # Wrap on spaces (ignores newlines)..
-        curline = ''
-        for word in text.split():
-            possibleline = ' '.join((curline, word))
+                newlines=newlines,
+                lstrip=lstrip
+            )
+        )
 
-            if len(possibleline) > blocksize:
-                # This word would exceed the limit, start a new line with it.
+    def iter_block(
+            self, text=None,
+            width=60, chars=False, newlines=False, lstrip=False):
+        """ Iterator that turns a long string into lines no greater than
+            'width' in length.
+            It can wrap on spaces or characters. It only does basic blocks.
+            For prepending see `iter_format_block()`.
+
+            Arguments:
+                text       : String to format.
+                width  : Maximum width for each line.
+                             Default: 60
+                chars      : Wrap on characters if true, otherwise on spaces.
+                             Default: False
+                newlines   : Preserve newlines when True.
+                             Default: False
+                lstrip     : Whether to remove leading spaces from each line.
+                             Default: False
+        """
+        text = text or self.text
+        if lstrip:
+            # Remove leading spaces from each line.
+            fmtline = str.lstrip
+        else:
+            # Yield the line as-is.
+            fmtline = lambda s: s
+
+        if chars and (not newlines):
+            # Simple block by chars, newlines are treated as a space.
+            text = ' '.join(text.splitlines())
+            yield from (
+                fmtline(text[i:i + width])
+                for i in range(0, len(text), width)
+            )
+        elif newlines:
+            # Preserve newlines
+            for line in text.splitlines():
+                yield from self.iter_block(
+                    line,
+                    width=width,
+                    chars=chars,
+                    lstrip=lstrip)
+        else:
+            # Wrap on spaces (ignores newlines)..
+            curline = ''
+            for word in text.split():
+                possibleline = ' '.join((curline, word)) if curline else word
+
+                if len(possibleline) > width:
+                    # This word would exceed the limit, start a new line with
+                    # it.
+                    yield fmtline(curline)
+                    curline = word
+                else:
+                    curline = possibleline
+            if curline:
                 yield fmtline(curline)
-                curline = word
-            else:
-                curline = possibleline
-        if curline:
-            yield fmtline(curline)
+
+    def iter_format_block(
+            self, text=None,
+            width=60, chars=False, newlines=False,
+            prepend=None, strip_first=False, lstrip=False):
+        """ Iterate over lines in a formatted block of text.
+            This iterator allows you to prepend to each line.
+            For basic blocks see iter_block().
+
+
+            Arguments:
+                text         : String to format.
+
+                width        : Maximum width for each line. The prepend string
+                               is not included in this calculation.
+                               Default: 60
+
+                chars        : Whether to wrap on characters instead of spaces.
+                               Default: False
+
+                newlines     : Whether to preserve newlines in the original
+                               string.
+                               Default: False
+
+                prepend      : String to prepend before each line.
+
+                strip_first  : Whether to omit the prepend string for the first
+                               line.
+                               Default: False
+
+                               Example (when using prepend='$'):
+                                Without strip_first -> '$this', '$that'
+                                   With strip_first -> 'this', '$that'
+
+                lstrip       : Whether to remove leading spaces from each line.
+                               This doesn't include any spaces in `prepend`.
+                               Default: False
+        """
+        iterlines = self.iter_block(
+            text or self.text,
+            width=width,
+            chars=chars,
+            newlines=newlines,
+            lstrip=lstrip)
+        if prepend is None:
+            yield from iterlines
+        else:
+            # Prepend text to each line.
+            for i, l in enumerate(iterlines):
+                if (i == 0) and strip_first:
+                    yield l
+                else:
+                    yield '{}{}'.format(prepend, l)
 
 
 def parse_int(s):
@@ -237,7 +273,7 @@ def parse_int(s):
 
 def read_stdin():
     """ Read from stdin, but print a helpful message if it's a tty. """
-    if sys.stdin.isatty():
+    if sys.stdout.isatty():
         print('\nReading from stdin until EOF (Ctrl + D)\n')
     return sys.stdin.read()
 
