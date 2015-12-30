@@ -26,27 +26,33 @@ USAGESTR = """{versionstr}
 
     Usage:
         {script} -h | -v
-        {script} [WORDS...] [-c] [-e] ([-i num] | [-I num]) [-l] [-n] [-w num]
+        {script} [WORDS...] [-w num]
+                 [-c] [-e] ([-i num] | [-I num])
+                 [-l] [-n] ([-p txt] | [-P txt])
 
     Options:
-        WORDS                : Words to format into a block.
-                               File names can be passed to read from a file.
-                               If not given, stdin is used instead.
-        -c,--chars           : Wrap on characters instead of spaces.
-        -e,--enumerate       : Print line numbers before each line.
-        -h,--help            : Show this help message.
-        -i num,--indent num  : Indention level. Each indent level is 4 spaces.
-                               Maximum width includes any indention.
-                               Default: 0
-        -I num,--INDENT num  : Same as --indent, except maximum width is
-                               calculated after indention.
-                               Default: 0
-        -l,--lstrip          : Remove leading spaces for each line, before
-                               indention.
-        -n,--newlines        : Preserve newlines.
-        -v,--version         : Show version.
-        -w num,--width num   : Maximum width for the block.
-                               Default: {defaultwidth}
+        WORDS                 : Words to format into a block.
+                                File names can be passed to read from a file.
+                                If not given, stdin is used instead.
+        -c,--chars            : Wrap on characters instead of spaces.
+        -e,--enumerate        : Print line numbers before each line.
+        -h,--help             : Show this help message.
+        -i num,--indent num   : Indention level. Each indent level is 4 spaces.
+                                Maximum width includes any indention.
+                                Default: 0
+        -I num,--INDENT num   : Same as --indent, except the indention is not
+                                included when calculating the width.
+                                Default: 0
+        -l,--lstrip           : Remove leading spaces for each line, before
+                                indention.
+        -n,--newlines         : Preserve newlines.
+        -p txt,--prepend txt  : Prepend this text before each line, after any
+                                indents.
+        -P txt,--PREPEND txt  : Same as --prepend, except the prepended text
+                                is not included when calculating the width.
+        -v,--version          : Show version.
+        -w num,--width num    : Maximum width for the block.
+                                Default: {defaultwidth}
 
         By default words are wrapped on spaces, so lines may be longer than the
         specified width. To force a hard limit use --chars.
@@ -58,12 +64,18 @@ USAGESTR = """{versionstr}
 
 def main(argd):
     """ Main entry point, expects doctopt arg dict as argd. """
-    width = parse_int(argd['--width'] or DEFAULT_WIDTH)
+    width = parse_int(argd['--width'] or DEFAULT_WIDTH) or 1
     indent = parse_int(argd['--indent'] or (argd['--INDENT'] or 0))
     prepend = ' ' * (indent * 4)
     if prepend and argd['--indent']:
         # Smart indent, change max width based on indention.
         width -= len(prepend)
+
+    userprepend = argd['--prepend'] or (argd['--PREPEND'] or '')
+    prepend = ''.join((prepend, userprepend))
+    if argd['--prepend']:
+        # Smart indent, change max width based on prepended text.
+        width -= len(userprepend)
 
     if argd['WORDS']:
         # Try each argument as a file name.
@@ -76,8 +88,7 @@ def main(argd):
     else:
         words = read_stdin()
 
-    block = FormatBlock().iter_format_block(
-        words,
+    block = FormatBlock(words).iter_format_block(
         chars=argd['--chars'],
         prepend=prepend,
         width=width,
@@ -89,7 +100,7 @@ def main(argd):
         if argd['--enumerate']:
             # Current line number format supports up to 999 lines before
             # messing up. Who would format 1000 lines like this anyway?
-            print('{: >3}: {}'.format(i, line))
+            print('{: >3}: {}'.format(i + 1, line))
         else:
             print(line)
 
@@ -160,14 +171,14 @@ class FormatBlock(object):
 
         if chars and (not newlines):
             # Simple block by chars, newlines are treated as a space.
-            text = ' '.join(text.splitlines())
+            text = ' '.join(text.split('\n'))
             yield from (
                 fmtline(text[i:i + width])
                 for i in range(0, len(text), width)
             )
         elif newlines:
             # Preserve newlines
-            for line in text.splitlines():
+            for line in text.split('\n'):
                 yield from self.iter_block(
                     line,
                     width=width,
