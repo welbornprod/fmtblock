@@ -114,22 +114,6 @@ class FormatBlock(object):
             self, text=None,
             width=60, chars=False, newlines=False,
             prepend=None, strip_first=False, lstrip=False):
-        """ Convenience method to allow things like this:
-            print(FormatBlock('this thing').format(width=20, chars=True))
-        """
-        return self.format_block(
-            text or self.text,
-            width=width,
-            chars=chars,
-            newlines=newlines,
-            prepend=prepend,
-            strip_first=strip_first,
-            lstrip=lstrip)
-
-    def format_block(
-            self, text=None,
-            width=60, chars=False, newlines=False,
-            prepend=None, strip_first=False, lstrip=False):
         """ Format a long string into a block of newline seperated text.
             Arguments:
                 See iter_format_block().
@@ -273,8 +257,8 @@ def parse_int(s):
 
 def read_stdin():
     """ Read from stdin, but print a helpful message if it's a tty. """
-    if sys.stdout.isatty():
-        print('\nReading from stdin until EOF (Ctrl + D)\n')
+    if sys.stdin.isatty() and sys.stdout.isatty():
+        print('\nReading from stdin until EOF (Ctrl + D)...\n')
     return sys.stdin.read()
 
 
