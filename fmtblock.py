@@ -71,9 +71,6 @@ USAGESTR = """{versionstr}
         -v,--version          : Show version.
         -w num,--width num    : Maximum width for the block.
                                 Default: {defaultwidth}
-
-        By default words are wrapped on spaces, so lines may be longer than
-        the specified width. To force a hard limit use --chars.
 """.format(
     script=SCRIPT,
     versionstr=VERSIONSTR,
