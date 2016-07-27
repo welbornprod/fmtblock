@@ -20,7 +20,7 @@ from docopt import docopt
 colr_auto_disable()
 
 NAME = 'Format Block'
-VERSION = '0.3.2'
+VERSION = '0.3.3'
 VERSIONSTR = '{} v. {}'.format(NAME, VERSION)
 SCRIPT = os.path.split(os.path.abspath(sys.argv[0]))[1]
 SCRIPTDIR = os.path.abspath(sys.path[0])
@@ -37,7 +37,7 @@ USAGESTR = """{versionstr}
         {script} -h | -v
         {script} [WORDS...] [-D] [-w num]
                  [-c | -f] [-e] ([-i num] | [-I num]) [-l] [-n]
-                 ([-s] [-p txt] | [-P txt]) ([-S] [-a txt] | [-A txt])
+                 ([-s] [-p txt | -P txt]) ([-S] [-a txt | -A txt])
 
     Options:
         WORDS                 : Words to format into a block.
@@ -256,7 +256,7 @@ class FormatBlock(object):
         # Basic usage of iter_format_block(), for convenience.
         return '\n'.join(
             self.iter_format_block(
-                text or self.text,
+                (self.text if text is None else text) or '',
                 prepend=prepend,
                 append=append,
                 strip_first=strip_first,
@@ -304,21 +304,17 @@ class FormatBlock(object):
                 lstrip   : Whether to remove leading spaces from each line.
                            Default: False
         """
-        text = text or self.text
-
-        if lstrip:
-            # Remove leading spaces from each line.
-            fmtline = str.lstrip
-        else:
-            # Yield the line as-is.
-            fmtline = str
+        text = (self.text if text is None else text) or ''
+        if width < 1:
+            width = 1
+        fmtline = str.lstrip if lstrip else str
 
         if chars and (not newlines):
             # Simple block by chars, newlines are treated as a space.
-            text = ' '.join(text.split('\n'))
-            yield from (
-                fmtline(text[i:i + width])
-                for i in range(0, len(text), width)
+            yield from self.iter_char_block(
+                text,
+                width=width,
+                fmtfunc=fmtline
             )
         elif newlines:
             # Preserve newlines
@@ -327,22 +323,27 @@ class FormatBlock(object):
                     line,
                     width=width,
                     chars=chars,
-                    lstrip=lstrip)
+                    lstrip=lstrip,
+                    newlines=False,
+                )
         else:
             # Wrap on spaces (ignores newlines)..
-            curline = ''
-            for word in text.split():
-                possibleline = ' '.join((curline, word)) if curline else word
+            yield from self.iter_space_block(
+                text,
+                width=width,
+                fmtfunc=fmtline,
+            )
 
-                if len(possibleline) > width:
-                    # This word would exceed the limit, start a new line with
-                    # it.
-                    yield fmtline(curline)
-                    curline = word
-                else:
-                    curline = possibleline
-            if curline:
-                yield fmtline(curline)
+    def iter_char_block(self, text=None, width=60, fmtfunc=str):
+        """ Format block by splitting on individual characters. """
+        if width < 1:
+            width = 1
+        text = (self.text if text is None else text) or ''
+        text = ' '.join(text.split('\n'))
+        yield from (
+            fmtfunc(text[i:i + width])
+            for i in range(0, len(text), width)
+        )
 
     def iter_format_block(
             self, text=None,
@@ -393,13 +394,17 @@ class FormatBlock(object):
         """
         if fill:
             chars = False
+
         iterlines = self.iter_block(
-            text or self.text,
+            (self.text if text is None else text) or '',
             width=width,
             chars=chars,
             newlines=newlines,
             lstrip=lstrip,
         )
+        if DEBUG:
+            iterlines = list(iterlines)
+            debug('formatting:\n{!r}\n'.format('\n'.join(iterlines)))
 
         if not (prepend or append):
             # Shortcut some of the logic below when not prepending/appending.
@@ -443,6 +448,26 @@ class FormatBlock(object):
                     yield self.expand_words(l, width=width)
                 else:
                     yield l
+
+    def iter_space_block(self, text=None, width=60, fmtfunc=str):
+        """ Format block by wrapping on spaces. """
+        if width < 1:
+            width = 1
+        curline = ''
+        text = (self.text if text is None else text) or ''
+        for word in text.split():
+            possibleline = ' '.join((curline, word)) if curline else word
+
+            if len(possibleline) > width:
+                # This word would exceed the limit, start a new line with
+                # it.
+                yield fmtfunc(curline)
+                curline = word
+            else:
+                curline = possibleline
+        # yield the last line.
+        if curline:
+            yield fmtfunc(curline)
 
     @staticmethod
     def squeeze_words(line, width=60):
