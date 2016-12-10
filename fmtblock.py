@@ -20,7 +20,7 @@ from docopt import docopt
 colr_auto_disable()
 
 NAME = 'Format Block'
-VERSION = '0.3.3'
+VERSION = '0.3.4'
 VERSIONSTR = '{} v. {}'.format(NAME, VERSION)
 SCRIPT = os.path.split(os.path.abspath(sys.argv[0]))[1]
 SCRIPTDIR = os.path.abspath(sys.path[0])
@@ -399,9 +399,6 @@ class FormatBlock(object):
             newlines=newlines,
             lstrip=lstrip,
         )
-        if DEBUG:
-            iterlines = list(iterlines)
-            debug('formatting:\n{!r}\n'.format('\n'.join(iterlines)))
 
         if not (prepend or append):
             # Shortcut some of the logic below when not prepending/appending.
