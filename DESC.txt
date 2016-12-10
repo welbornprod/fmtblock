@@ -1,0 +1,1 @@
+Format blocks of characters for display, split by words, characters, or newlines.

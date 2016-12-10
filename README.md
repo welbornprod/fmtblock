@@ -59,28 +59,52 @@ _______________________________________________________________________________
 versions would be trivial, but I don't plan on doing it (just use `for-loops`
 and `yield` instead of `yield from`).
 
+## Python Dependencies:
+
+These are installable with `pip`.
+
+* **Colr** - Used for colorized output.
+* **Docopt** - Used to handle command-line argument parsing.
+
 _______________________________________________________________________________
 
 ## Installation:
 
-* Download `fmtblock.py` or clone this repo:
+Install the module with pip:
 ```
-git clone https://github.com/welbornprod/fmtblock.git
-```
-
-* Change to the fmtblock directory (containing `fmtblock.py`):
-```
-cd fmtblock
+# You may have to use pip3 here.
+pip install formatblock
 ```
 
-* Symlink the script into a directory in your `$PATH`:
+Then you can run it like this:
 ```
-ln -s "$PWD/fmtblock.py" ~/bin/fmtblock
+fmtblock --help
 ```
 
-Now you can run `fmtblock` instead of `./fmtblock.py`.
+Or like this:
+```
+python3 -m fmtblock --help
+```
 
-_______________________________________________________________________________
+## Imports
+
+All of the functionality for `fmtblock` is contained in a class called
+`FormatBlock`, which is importable for use in your project.
+
+```python
+from fmtblock import FormatBlock
+
+print(FormatBlock('This is a test okay.').format(width=5))
+```
+
+Output:
+```
+This
+is a
+test
+okay.
+```
+______________________________________________________________________________
 
 ## Examples:
 
@@ -154,6 +178,7 @@ seq 1 3 | fmtblock -i 1 -n
 ```
 
 Output:
+
 ```
     1
     2
