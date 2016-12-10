@@ -80,7 +80,7 @@ Install the module with pip:
 ::
 
     # You may have to use pip3 here.
-    pip install fmtblock
+    pip install formatblock
 
 Then you can run it like this:
 

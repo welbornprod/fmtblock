@@ -53,7 +53,7 @@ else:
 
 setup(
     name='FormatBlock',
-    version='0.3.5',
+    version='0.3.6',
     author='Christopher Welborn',
     author_email='cj@welbornprod.com',
     packages=['fmtblock'],
