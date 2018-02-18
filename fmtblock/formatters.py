@@ -1,4 +1,11 @@
-__version__ = '0.3.6'
+from .escapecodes import (
+    get_codes,
+    get_indices,
+    get_indices_list,
+    strip_codes,
+)
+
+__version__ = '0.4.1'
 
 
 class FormatBlock(object):
@@ -21,7 +28,7 @@ class FormatBlock(object):
             return line
         # Word index, which word to insert on (cycles between 1->len(words))
         wordi = 1
-        while len(line) < width:
+        while len(strip_codes(line)) < width:
             wordendi = self.find_word_end(line, wordi)
             if wordendi < 0:
                 # Reached the end?, try starting at the front again.
@@ -34,6 +41,9 @@ class FormatBlock(object):
                 line = ' '.join((line[:wordendi], line[wordendi:]))
                 wordi += 1
 
+        # Don't push a single word all the way to the right.
+        if ' ' not in strip_codes(line).strip():
+            return line.replace(' ', '')
         return line
 
     @staticmethod
@@ -43,6 +53,8 @@ class FormatBlock(object):
             The last word doesn't count.
             If there are no words, or there are no spaces in the word, it
             returns -1.
+
+            This method ignores escape codes.
             Example:
                 s = 'this is a test'
                 i = find_word_end(s, count=1)
@@ -52,21 +64,56 @@ class FormatBlock(object):
                 print('-'.join((s[:i], s[i:])))
                 # 'this is- a test'
         """
+        if not text:
+            return -1
+        elif ' ' not in text:
+            return 0
+        elif not text.strip():
+            return -1
         count = count or 1
         found = 0
         foundindex = -1
         inword = False
-        for i, c in enumerate(text):
+        indices = get_indices(str(text))
+        sortedindices = sorted(indices)
+        for i in sortedindices:
+            c = indices[i]
             if inword and c.isspace():
                 # Found space.
                 inword = False
                 foundindex = i
                 found += 1
+                # Was there an escape code before this space?
+                testindex = i
+                while testindex > 0:
+                    testindex -= 1
+                    s = indices.get(testindex, None)
+                    if s is None:
+                        # Must be in the middle of an escape code.
+                        continue
+                    if len(s) == 1:
+                        # Test index was a char.
+                        foundindex = testindex + 1
+                        break
+
                 if found == count:
                     return foundindex
             elif not c.isspace():
                 inword = True
-        # We ended in a word, or there were no words.
+        # We ended in a word/escape-code, or there were no words.
+        lastindex = sortedindices[-1]
+        if len(indices[lastindex]) > 1:
+            # Last word included an escape code. Rewind a bit.
+            while lastindex > 0:
+                lastindex -= 1
+                s = indices.get(lastindex, None)
+                if s is None:
+                    # Must be in the middle of an escape code.
+                    continue
+                if len(s) == 1:
+                    # Found last char.
+                    return lastindex + 1
+
         return -1 if inword else foundindex
 
     def format(
@@ -165,10 +212,28 @@ class FormatBlock(object):
             width = 1
         text = (self.text if text is None else text) or ''
         text = ' '.join(text.split('\n'))
-        yield from (
-            fmtfunc(text[i:i + width])
-            for i in range(0, len(text), width)
-        )
+        escapecodes = get_codes(text)
+        if not escapecodes:
+            # No escape codes, use simple method.
+            yield from (
+                fmtfunc(text[i:i + width])
+                for i in range(0, len(text), width)
+            )
+        else:
+            # Ignore escape codes when counting.
+            blockwidth = 0
+            block = []
+            for i, s in enumerate(get_indices_list(text)):
+                block.append(s)
+                if len(s) == 1:
+                    # Normal char.
+                    blockwidth += 1
+                if blockwidth == width:
+                    yield ''.join(block)
+                    block = []
+                    blockwidth = 0
+            if block:
+                yield ''.join(block)
 
     def iter_format_block(
             self, text=None,
@@ -279,8 +344,10 @@ class FormatBlock(object):
         text = (self.text if text is None else text) or ''
         for word in text.split():
             possibleline = ' '.join((curline, word)) if curline else word
-
-            if len(possibleline) > width:
+            # Ignore escape codes.
+            codelen = sum(len(s) for s in get_codes(possibleline))
+            reallen = len(possibleline) - codelen
+            if reallen > width:
                 # This word would exceed the limit, start a new line with
                 # it.
                 yield fmtfunc(curline)

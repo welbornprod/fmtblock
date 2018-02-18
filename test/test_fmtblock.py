@@ -15,6 +15,173 @@ from fmtblock import FormatBlock
 
 class FmtBlockTests(unittest.TestCase):
 
+    def test_expand_words(self):
+        """ expand_words() should insert spaces to make words fit. """
+        s = 'This is a test and only a test. I really like this test.'
+        expected = {
+            25: """
+This is a test and only a
+test.  I really like this
+test.
+""".strip(),
+            30: """
+This  is  a  test  and  only a
+test. I really like this test.
+""".strip(),
+            15: """
+This  is a test
+and    only   a
+test.  I really
+like this test.
+""".strip(),
+        }
+        for width, expectedstr in expected.items():
+            result = FormatBlock(s).format(fill=True, width=width)
+            self.assertEqual(
+                result,
+                expectedstr,
+                msg='\n'.join((
+                    'Failed to expand words correctly. Width: {}'.format(
+                        width
+                    ),
+                    'Result:\n{}'.format(result),
+                    'Expected:\n{}'.format(expectedstr),
+                ))
+            )
+
+    def test_expand_words_colr(self):
+        """ expand_words() should ignore escape codes. """
+        s = ''.join((
+            '\x1b[38;5;57mT\x1b[0m\x1b[38;5;63mh\x1b[0m\x1b[38;5;63mi',
+            '\x1b[0m\x1b[38;5;63ms\x1b[0m\x1b[38;5;63m \x1b[0m\x1b[38;5;63mi',
+            '\x1b[0m\x1b[38;5;63ms\x1b[0m\x1b[38;5;63m \x1b[0m\x1b[38;5;63ma',
+            '\x1b[0m\x1b[38;5;63m \x1b[0m\x1b[38;5;27mt\x1b[0m\x1b[38;5;27me',
+            '\x1b[0m\x1b[38;5;27ms\x1b[0m\x1b[38;5;27mt\x1b[0m\x1b[38;5;27m ',
+            '\x1b[0m\x1b[38;5;27ma\x1b[0m\x1b[38;5;27mn\x1b[0m\x1b[38;5;27md',
+            '\x1b[0m\x1b[38;5;33m \x1b[0m\x1b[38;5;33mo\x1b[0m\x1b[38;5;33mn',
+            '\x1b[0m\x1b[38;5;33ml\x1b[0m\x1b[38;5;33my\x1b[0m\x1b[38;5;32m ',
+            '\x1b[0m\x1b[38;5;32ma\x1b[0m\x1b[38;5;32m \x1b[0m\x1b[38;5;32mt',
+            '\x1b[0m\x1b[38;5;32me\x1b[0m\x1b[38;5;38ms\x1b[0m\x1b[38;5;38mt',
+            '\x1b[0m\x1b[38;5;38m.\x1b[0m',
+        ))
+
+        expected = {
+            10: ''.join((
+                '\x1b[38;5;57mT\x1b[0m\x1b[38;5;63mh\x1b[0m\x1b[38;5;63mi',
+                '\x1b[0m\x1b[38;5;63ms \x1b[0m\x1b[38;5;63m \x1b[0m',
+                '\x1b[38;5;63mi\x1b[0m\x1b[38;5;63ms\x1b[0m\x1b[38;5;63m ',
+                '\x1b[0m\x1b[38;5;63ma\x1b[0m\x1b[38;5;63m\n\x1b[0m',
+                '\x1b[38;5;27mt\x1b[0m\x1b[38;5;27me\x1b[0m\x1b[38;5;27ms',
+                '\x1b[0m\x1b[38;5;27mt  \x1b[0m\x1b[38;5;27m \x1b[0m',
+                '\x1b[38;5;27ma\x1b[0m\x1b[38;5;27mn\x1b[0m\x1b[38;5;27md',
+                '\x1b[0m\x1b[38;5;33m\n\x1b[0m\x1b[38;5;33mo\x1b[0m',
+                '\x1b[38;5;33mn\x1b[0m\x1b[38;5;33ml\x1b[0m',
+                '\x1b[38;5;33my  \x1b[0m\x1b[38;5;32m \x1b[0m',
+                '\x1b[38;5;32ma  \x1b[0m\x1b[38;5;32m\n\x1b[0m',
+                '\x1b[38;5;32mt\x1b[0m\x1b[38;5;32me\x1b[0m\x1b[38;5;38ms',
+                '\x1b[0m\x1b[38;5;38mt\x1b[0m\x1b[38;5;38m.\x1b[0m',
+            )),
+            15: ''.join((
+                '\x1b[38;5;57mT\x1b[0m\x1b[38;5;63mh\x1b[0m\x1b[38;5;63mi',
+                '\x1b[0m\x1b[38;5;63ms \x1b[0m\x1b[38;5;63m \x1b[0m',
+                '\x1b[38;5;63mi\x1b[0m\x1b[38;5;63ms\x1b[0m',
+                '\x1b[38;5;63m \x1b[0m\x1b[38;5;63ma\x1b[0m',
+                '\x1b[38;5;63m \x1b[0m\x1b[38;5;27mt\x1b[0m\x1b[38;5;27me',
+                '\x1b[0m\x1b[38;5;27ms\x1b[0m\x1b[38;5;27mt\x1b[0m',
+                '\x1b[38;5;27m\n\x1b[0m\x1b[38;5;27ma\x1b[0m\x1b[38;5;27mn',
+                '\x1b[0m\x1b[38;5;27md  \x1b[0m\x1b[38;5;33m \x1b[0m',
+                '\x1b[38;5;33mo\x1b[0m\x1b[38;5;33mn\x1b[0m\x1b[38;5;33ml',
+                '\x1b[0m\x1b[38;5;33my  \x1b[0m\x1b[38;5;32m \x1b[0m',
+                '\x1b[38;5;32ma \x1b[0m\x1b[38;5;32m\n\x1b[0m',
+                '\x1b[38;5;32mt\x1b[0m\x1b[38;5;32me\x1b[0m\x1b[38;5;38ms',
+                '\x1b[0m\x1b[38;5;38mt\x1b[0m\x1b[38;5;38m.\x1b[0m',
+            )),
+            20: ''.join((
+                '\x1b[38;5;57mT\x1b[0m\x1b[38;5;63mh\x1b[0m\x1b[38;5;63mi',
+                '\x1b[0m\x1b[38;5;63ms  \x1b[0m\x1b[38;5;63m \x1b[0m',
+                '\x1b[38;5;63mi\x1b[0m\x1b[38;5;63ms\x1b[0m',
+                '\x1b[38;5;63m \x1b[0m\x1b[38;5;63ma\x1b[0m',
+                '\x1b[38;5;63m \x1b[0m\x1b[38;5;27mt\x1b[0m\x1b[38;5;27me',
+                '\x1b[0m\x1b[38;5;27ms\x1b[0m\x1b[38;5;27mt\x1b[0m',
+                '\x1b[38;5;27m \x1b[0m\x1b[38;5;27ma\x1b[0m\x1b[38;5;27mn',
+                '\x1b[0m\x1b[38;5;27md\x1b[0m\x1b[38;5;33m\n\x1b[0m',
+                '\x1b[38;5;33mo\x1b[0m\x1b[38;5;33mn\x1b[0m\x1b[38;5;33ml',
+                '\x1b[0m\x1b[38;5;33my  \x1b[0m\x1b[38;5;32m \x1b[0m',
+                '\x1b[38;5;32ma  \x1b[0m\x1b[38;5;32m \x1b[0m',
+                '\x1b[38;5;32mt\x1b[0m\x1b[38;5;32me\x1b[0m\x1b[38;5;38ms',
+                '\x1b[0m\x1b[38;5;38mt\x1b[0m\x1b[38;5;38m.    \x1b[0m',
+            )),
+        }
+        for width, expectedstr in expected.items():
+            result = FormatBlock(s).format(fill=True, width=width)
+            self.assertEqual(
+                result,
+                expectedstr,
+                msg='\n'.join((
+                    'Failed to expand words correctly. Width: {}'.format(
+                        width
+                    ),
+                    'Result:\n{}'.format(result),
+                    'Expected:\n{}'.format(expectedstr),
+                ))
+            )
+
+    def test_find_word_end(self):
+        """ find_word_end() should correctly find the end of words. """
+        words = 'this is a test and only a test. not a problem.'.split()
+        s = ' '.join(words)
+        for cnt in range(1, len(words)):
+            i = FormatBlock().find_word_end(s, count=cnt)
+            result = '-'.join((s[:i], s[i:]))
+            self.assertEqual(
+                result,
+                '{}- {}'.format(' '.join(words[:cnt]), ' '.join(words[cnt:])),
+                msg='Failed to find word end. Count: {}'.format(cnt)
+            )
+
+        # No words, should return -1.
+        self.assertEqual(
+            FormatBlock().find_word_end('', count=1),
+            -1,
+            msg='No words to find. Should\'ve returned -1.',
+        )
+        self.assertEqual(
+            FormatBlock().find_word_end('      ', count=1),
+            -1,
+            msg='No words to find. Should\'ve returned -1.',
+        )
+        # Single word.
+        self.assertEqual(
+            FormatBlock().find_word_end('test', count=1),
+            0,
+            msg='Single word, should\'ve returned 0.',
+        )
+
+    def test_find_word_end_colr(self):
+        """ find_word_end() should ignore escape codes. """
+        s = '\x1b[31mtest\x1b[0m \x1b[34mthis\x1b[0m \x1b[32mout\x1b[0m'
+        i = FormatBlock().find_word_end(s, count=1)
+        result = '-'.join((s[:i], s[i:]))
+        self.assertEqual(
+            result,
+            '\x1b[31mtest-\x1b[0m \x1b[34mthis\x1b[0m \x1b[32mout\x1b[0m',
+            msg='Failed to find word end with escape codes.'
+        )
+        i = FormatBlock().find_word_end(s, count=2)
+        result = '-'.join((s[:i], s[i:]))
+        self.assertEqual(
+            result,
+            '\x1b[31mtest\x1b[0m \x1b[34mthis-\x1b[0m \x1b[32mout\x1b[0m',
+            msg='Failed to find word end with escape codes.'
+        )
+        i = FormatBlock().find_word_end(s, count=3)
+        result = '-'.join((s[:i], s[i:]))
+        self.assertEqual(
+            result,
+            '\x1b[31mtest\x1b[0m \x1b[34mthis\x1b[0m \x1b[32mout-\x1b[0m',
+            msg='Failed to find word end with escape codes.'
+        )
+
     def test_format_append(self):
         """ format() should append text after wrapping. """
         s = 'A AA AAA B BB BBB C CC CCC'
